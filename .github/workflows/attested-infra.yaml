@@ -21,14 +21,12 @@ on:
         type: choice
         options: [apply, destroy]
 
-env:
-  PLATFORM_URL: https://platform.testifysec.com
-
 permissions:
   id-token: write
   contents: read
 
 env:
+  PLATFORM_URL: https://platform.testifysec.com
   AWS_REGION: us-east-1
   TF_VERSION: "1.9.8"
   TF_DIR: terraform/demo
