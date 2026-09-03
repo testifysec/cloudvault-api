@@ -51,7 +51,7 @@ jobs:
           STEP: lint
           ATTESTATIONS: environment git github secretscan
           COMMAND: >-
-            echo "lint passed
+            echo "lint passed"
 
       # ---- SA-11: SAST (gosec → SARIF) ----
       - name: Install gosec
@@ -247,7 +247,7 @@ jobs:
           STEP: system-packages
           ATTESTATIONS: environment git github system-packages
           COMMAND: >-
-            echo "capturing OS package inventory
+            echo "capturing OS package inventory"
 
       # ---- Docker build ----
       - name: Docker Build
