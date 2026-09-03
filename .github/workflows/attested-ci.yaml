@@ -29,10 +29,8 @@ jobs:
           install -m 0755 /tmp/cilock /usr/local/bin/cilock
           cilock version
 
-      - name: Platform login (API token, bound to tenant + product)
-        env:
-          TESTIFYSEC_TOKEN: ${{ secrets.TESTIFYSEC_TOKEN }}
-        run: cilock login --platform-url "${PLATFORM_URL}" --token "${TESTIFYSEC_TOKEN}" --tenant-id bb84a7e4-9ce3-434b-a0c6-d9e6e247ec16 --product-id "${{ vars.TESTIFYSEC_PRODUCT_ID }}"
+      - name: Platform login (ambient GitHub workflow identity)
+        run: cilock login --workflow-identity --platform-url "${PLATFORM_URL}"
 
       - name: Bind product
         if: ${{ vars.TESTIFYSEC_PRODUCT_ID != '' }}
