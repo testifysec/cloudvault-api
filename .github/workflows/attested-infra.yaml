@@ -21,6 +21,9 @@ on:
         type: choice
         options: [apply, destroy]
 
+env:
+  PLATFORM_URL: https://platform.testifysec.com
+
 permissions:
   id-token: write
   contents: read
@@ -38,6 +41,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install cilock (built from judge main, release cilock-2026-09-03)
+        run: |
+          curl -sSL -o /tmp/cilock https://github.com/cloudvault-dev/cloudvault-api/releases/download/cilock-2026-09-03/cilock-linux-amd64
+          echo "464ec5650490b54561b73e087da0907360e4ceda43a7f99e7aadda28954cb7f6  /tmp/cilock" | sha256sum -c -
+          install -m 0755 /tmp/cilock /usr/local/bin/cilock
+          cilock version
+
+      - name: Platform login (ambient GitHub workflow identity)
+        run: cilock login --workflow-identity --platform-url "${PLATFORM_URL}"
+
+      - name: Bind product
+        if: ${{ vars.TESTIFYSEC_PRODUCT_ID != '' }}
+        run: cilock use --product-id "${{ vars.TESTIFYSEC_PRODUCT_ID }}" --product-name cloudvault
+
       - name: Configure AWS credentials (GitHub OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -54,12 +71,13 @@ jobs:
 
       # ---- CM-6 / SA-11: IaC misconfiguration scan ----
       - name: IaC Scan (checkov)
-        uses: aflock-ai/cilock-action@v4.2.0
-        with:
-          step: iac-scan
-          command: bash -c "checkov -d ${TF_DIR} -o sarif --output-file-path . --quiet || true; test -f results_sarif.sarif && mv results_sarif.sarif checkov.sarif || true"
-          attestations: environment git github sarif
-          product-include-glob: "checkov.sarif"
+        run: scripts/attest.sh
+        env:
+          STEP: iac-scan
+          ATTESTATIONS: environment git github sarif
+          PRODUCT_GLOB: "checkov.sarif"
+          COMMAND: >-
+            checkov -d ${TF_DIR} -o sarif --output-file-path . --quiet || true; test -f results_sarif.sarif && mv results_sarif.sarif checkov.sarif || true
 
       - name: Terraform Init
         run: |
@@ -71,22 +89,24 @@ jobs:
       # ---- CM-3 / CM-4: what will change, recorded before it changes ----
       - name: Terraform Plan
         if: ${{ github.event.inputs.action != 'destroy' }}
-        uses: aflock-ai/cilock-action@v4.2.0
-        with:
-          step: terraform-plan
-          command: bash -c "terraform -chdir=${TF_DIR} plan -input=false -out=tfplan.bin && terraform -chdir=${TF_DIR} show -json tfplan.bin > ${TF_DIR}/tfplan.json"
-          attestations: environment git github aws
-          product-include-glob: "terraform/demo/tfplan.json"
+        run: scripts/attest.sh
+        env:
+          STEP: terraform-plan
+          ATTESTATIONS: environment git github aws
+          PRODUCT_GLOB: "terraform/demo/tfplan.json"
+          COMMAND: >-
+            terraform -chdir=${TF_DIR} plan -input=false -out=tfplan.bin && terraform -chdir=${TF_DIR} show -json tfplan.bin > ${TF_DIR}/tfplan.json
 
       # ---- CM-2 / CM-8: the change itself ----
       - name: Terraform Apply
         if: ${{ github.event.inputs.action != 'destroy' }}
-        uses: aflock-ai/cilock-action@v4.2.0
-        with:
-          step: terraform-apply
-          command: bash -c "terraform -chdir=${TF_DIR} apply -input=false -auto-approve tfplan.bin && terraform -chdir=${TF_DIR} output -json > ${TF_DIR}/outputs.json"
-          attestations: environment git github aws
-          product-include-glob: "terraform/demo/outputs.json"
+        run: scripts/attest.sh
+        env:
+          STEP: terraform-apply
+          ATTESTATIONS: environment git github aws
+          PRODUCT_GLOB: "terraform/demo/outputs.json"
+          COMMAND: >-
+            terraform -chdir=${TF_DIR} apply -input=false -auto-approve tfplan.bin && terraform -chdir=${TF_DIR} output -json > ${TF_DIR}/outputs.json
 
       - name: Terraform Destroy
         if: ${{ github.event.inputs.action == 'destroy' }}
@@ -99,9 +119,10 @@ jobs:
       # ---- CA-7 / RA-5 / SI-4: posture of the account as built ----
       - name: Cloud Posture (prowler)
         if: ${{ github.event.inputs.action != 'destroy' }}
-        uses: aflock-ai/cilock-action@v4.2.0
-        with:
-          step: cloud-posture
-          command: bash -c "prowler aws --region ${AWS_REGION} -M json-asff -o prowler-out -F prowler --ignore-exit-code-3 --no-banner || true; cp prowler-out/prowler.asff.json prowler.asff.json"
-          attestations: environment git github aws asff
-          product-include-glob: "prowler.asff.json"
+        run: scripts/attest.sh
+        env:
+          STEP: cloud-posture
+          ATTESTATIONS: environment git github aws asff
+          PRODUCT_GLOB: "prowler.asff.json"
+          COMMAND: >-
+            prowler aws --region ${AWS_REGION} -M json-asff -o prowler-out -F prowler --ignore-exit-code-3 --no-banner || true; cp prowler-out/prowler.asff.json prowler.asff.json
