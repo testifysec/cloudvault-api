@@ -54,7 +54,7 @@ jobs:
 
       # ---- CM-6 / SA-11: IaC misconfiguration scan ----
       - name: IaC Scan (checkov)
-        uses: aflock-ai/cilock-action@main
+        uses: aflock-ai/cilock-action@v4.2.0
         with:
           step: iac-scan
           command: bash -c "checkov -d ${TF_DIR} -o sarif --output-file-path . --quiet || true; test -f results_sarif.sarif && mv results_sarif.sarif checkov.sarif || true"
@@ -71,7 +71,7 @@ jobs:
       # ---- CM-3 / CM-4: what will change, recorded before it changes ----
       - name: Terraform Plan
         if: ${{ github.event.inputs.action != 'destroy' }}
-        uses: aflock-ai/cilock-action@main
+        uses: aflock-ai/cilock-action@v4.2.0
         with:
           step: terraform-plan
           command: bash -c "terraform -chdir=${TF_DIR} plan -input=false -out=tfplan.bin && terraform -chdir=${TF_DIR} show -json tfplan.bin > ${TF_DIR}/tfplan.json"
@@ -81,7 +81,7 @@ jobs:
       # ---- CM-2 / CM-8: the change itself ----
       - name: Terraform Apply
         if: ${{ github.event.inputs.action != 'destroy' }}
-        uses: aflock-ai/cilock-action@main
+        uses: aflock-ai/cilock-action@v4.2.0
         with:
           step: terraform-apply
           command: bash -c "terraform -chdir=${TF_DIR} apply -input=false -auto-approve tfplan.bin && terraform -chdir=${TF_DIR} output -json > ${TF_DIR}/outputs.json"
@@ -99,7 +99,7 @@ jobs:
       # ---- CA-7 / RA-5 / SI-4: posture of the account as built ----
       - name: Cloud Posture (prowler)
         if: ${{ github.event.inputs.action != 'destroy' }}
-        uses: aflock-ai/cilock-action@main
+        uses: aflock-ai/cilock-action@v4.2.0
         with:
           step: cloud-posture
           command: bash -c "prowler aws --region ${AWS_REGION} -M json-asff -o prowler-out -F prowler --ignore-exit-code-3 --no-banner || true; cp prowler-out/prowler.asff.json prowler.asff.json"

@@ -28,7 +28,7 @@ jobs:
       # secretscan attestor scans sibling attestors' outputs (stdout,
       # env vars, products) for leaked secrets before the DSSE ships.
       - name: Lint + Secrets
-        uses: aflock-ai/cilock-action@main
+        uses: aflock-ai/cilock-action@v4.2.0
         with:
           step: lint
           command: echo "lint passed"
@@ -39,7 +39,7 @@ jobs:
         run: go install github.com/securego/gosec/v2/cmd/gosec@latest
 
       - name: SAST
-        uses: aflock-ai/cilock-action@main
+        uses: aflock-ai/cilock-action@v4.2.0
         with:
           step: sast
           command: bash -c "gosec -fmt=sarif -out=gosec.sarif ./... || true"
@@ -53,7 +53,7 @@ jobs:
 
       - name: SAST (semgrep)
         continue-on-error: true
-        uses: aflock-ai/cilock-action@main
+        uses: aflock-ai/cilock-action@v4.2.0
         with:
           step: sast-semgrep
           command: bash -c "semgrep --config=auto --sarif -o semgrep.sarif . || true"
@@ -71,7 +71,7 @@ jobs:
 
       - name: Secret Scan (gitleaks)
         continue-on-error: true
-        uses: aflock-ai/cilock-action@main
+        uses: aflock-ai/cilock-action@v4.2.0
         with:
           step: secretscan-gitleaks
           command: bash -c "gitleaks detect --no-git -f sarif -r gitleaks.sarif --source . || gitleaks dir . -f sarif -r gitleaks.sarif || true"
@@ -80,7 +80,7 @@ jobs:
 
       # ---- Test ----
       - name: Test
-        uses: aflock-ai/cilock-action@main
+        uses: aflock-ai/cilock-action@v4.2.0
         with:
           step: test
           command: go test -count=1 ./...
@@ -93,7 +93,7 @@ jobs:
 
       - name: Test Results
         continue-on-error: true
-        uses: aflock-ai/cilock-action@main
+        uses: aflock-ai/cilock-action@v4.2.0
         with:
           step: test-results
           command: bash -c "gotestsum --junitfile=junit.xml -- -count=1 ./... || true"
@@ -107,7 +107,7 @@ jobs:
 
       - name: Govulncheck
         continue-on-error: true
-        uses: aflock-ai/cilock-action@main
+        uses: aflock-ai/cilock-action@v4.2.0
         with:
           step: govulncheck
           command: bash -c "govulncheck -json ./... > govulncheck.json || true"
@@ -119,7 +119,7 @@ jobs:
         run: go install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@v1.9.0
 
       - name: Build + SBOM
-        uses: aflock-ai/cilock-action@main
+        uses: aflock-ai/cilock-action@v4.2.0
         with:
           step: build
           command: bash -c "CGO_ENABLED=0 go build -o bin/api ./cmd/api && cyclonedx-gomod app -licenses -json -output bin/bom.cdx.json -main ./cmd/api ."
@@ -130,7 +130,7 @@ jobs:
       # Bare `go build` (no bash -c) so the go-build attestor observes the argv.
       - name: Go Build Provenance
         continue-on-error: true
-        uses: aflock-ai/cilock-action@main
+        uses: aflock-ai/cilock-action@v4.2.0
         with:
           step: go-build
           command: go build -o bin/api-provenance ./cmd/api
@@ -144,7 +144,7 @@ jobs:
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
 
       - name: Vuln Scan
-        uses: aflock-ai/cilock-action@main
+        uses: aflock-ai/cilock-action@v4.2.0
         with:
           step: vuln-scan
           command: bash -c "trivy fs --format sarif -o trivy.sarif . || true"
@@ -155,7 +155,7 @@ jobs:
       # Bare `trivy` argv so the trivy attestor emits the native trivy predicate.
       - name: Vuln Scan (trivy native)
         continue-on-error: true
-        uses: aflock-ai/cilock-action@main
+        uses: aflock-ai/cilock-action@v4.2.0
         with:
           step: vuln-trivy
           command: trivy fs --format json --output trivy.json .
@@ -169,7 +169,7 @@ jobs:
 
       - name: Vuln Scan (grype)
         continue-on-error: true
-        uses: aflock-ai/cilock-action@main
+        uses: aflock-ai/cilock-action@v4.2.0
         with:
           step: vuln-grype
           command: bash -c "grype dir:. -o sarif > grype.sarif || true"
@@ -186,7 +186,7 @@ jobs:
 
       - name: Vuln Scan (osv-scanner)
         continue-on-error: true
-        uses: aflock-ai/cilock-action@main
+        uses: aflock-ai/cilock-action@v4.2.0
         with:
           step: vuln-osv
           command: bash -c "osv-scanner --format sarif -r . > osv.sarif || true"
@@ -202,7 +202,7 @@ jobs:
 
       - name: Lockfiles
         continue-on-error: true
-        uses: aflock-ai/cilock-action@main
+        uses: aflock-ai/cilock-action@v4.2.0
         with:
           step: lockfiles
           command: bash -c "go mod download 2>/dev/null || true"
@@ -211,7 +211,7 @@ jobs:
       # ---- CM-8: OS component inventory (system-packages) ----
       - name: System Packages
         continue-on-error: true
-        uses: aflock-ai/cilock-action@main
+        uses: aflock-ai/cilock-action@v4.2.0
         with:
           step: system-packages
           command: echo "capturing OS package inventory"
@@ -219,7 +219,7 @@ jobs:
 
       # ---- Docker build ----
       - name: Docker Build
-        uses: aflock-ai/cilock-action@main
+        uses: aflock-ai/cilock-action@v4.2.0
         with:
           step: docker-build
           command: docker buildx build --metadata-file docker-metadata.json -t dropbox-clone:test --load .
@@ -236,7 +236,7 @@ jobs:
 
       - name: Config Scan (hadolint)
         continue-on-error: true
-        uses: aflock-ai/cilock-action@main
+        uses: aflock-ai/cilock-action@v4.2.0
         with:
           step: config-hadolint
           command: bash -c "hadolint --format sarif Dockerfile > hadolint.sarif || true"
@@ -250,7 +250,7 @@ jobs:
 
       - name: Image SBOM (syft)
         continue-on-error: true
-        uses: aflock-ai/cilock-action@main
+        uses: aflock-ai/cilock-action@v4.2.0
         with:
           step: image-sbom
           command: bash -c "syft dropbox-clone:test -o cyclonedx-json=syft.cdx.json || true"
@@ -260,7 +260,7 @@ jobs:
       # ---- SR-11 / SR-4: OCI image export → oci ----
       - name: OCI Export
         continue-on-error: true
-        uses: aflock-ai/cilock-action@main
+        uses: aflock-ai/cilock-action@v4.2.0
         with:
           step: oci-export
           command: bash -c "docker save dropbox-clone:test -o image.oci.tar || true"
@@ -293,7 +293,7 @@ jobs:
 
       - name: VEX
         continue-on-error: true
-        uses: aflock-ai/cilock-action@main
+        uses: aflock-ai/cilock-action@v4.2.0
         with:
           step: vex
           command: bash -c "cp app.openvex.src.json app.openvex.json || true"
@@ -322,7 +322,7 @@ jobs:
       # deploy to a cluster that no longer exists.
       - name: Deploy
         if: false
-        uses: aflock-ai/cilock-action@main
+        uses: aflock-ai/cilock-action@v4.2.0
         with:
           step: deploy
           command: |
@@ -334,7 +334,7 @@ jobs:
       # ---- Smoke test against deployed endpoint: RETIRED 2026-07-12 (depends on Deploy above) ----
       - name: Smoke Test
         if: false
-        uses: aflock-ai/cilock-action@main
+        uses: aflock-ai/cilock-action@v4.2.0
         with:
           step: smoke-test
           command: |
@@ -350,7 +350,7 @@ jobs:
 
       - name: Cloud Posture (Prowler)
         if: env.AWS_ACCESS_KEY_ID != ''
-        uses: aflock-ai/cilock-action@main
+        uses: aflock-ai/cilock-action@v4.2.0
         with:
           step: cloud-posture
           command: bash -c "/tmp/prowler-venv/bin/prowler aws --severity critical high --compliance cis_1.5_aws -M json-ocsf -o prowler-results || true"
