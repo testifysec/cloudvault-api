@@ -33,6 +33,9 @@ func Middleware(jwtService *JWTService) func(http.Handler) http.Handler {
 				return
 			}
 
+			// Trim stray whitespace some proxies add to the header.
+			authHeader = strings.TrimSpace(authHeader)
+
 			// Check for Bearer prefix
 			parts := strings.SplitN(authHeader, " ", 2)
 			if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
