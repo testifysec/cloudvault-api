@@ -29,6 +29,12 @@ func Middleware(jwtService *JWTService) func(http.Handler) http.Handler {
 			// Get the Authorization header
 			authHeader := r.Header.Get("Authorization")
 			if authHeader == "" {
+				// Browser download links cannot set headers; accept the token as a query parameter.
+				if t := r.URL.Query().Get("token"); t != "" {
+					authHeader = "Bearer " + t
+				}
+			}
+			if authHeader == "" {
 				http.Error(w, "Authorization header required", http.StatusUnauthorized)
 				return
 			}
