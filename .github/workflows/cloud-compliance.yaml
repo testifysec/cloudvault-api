@@ -34,7 +34,7 @@ jobs:
           cilock version
 
       - name: Platform login (ambient GitHub workflow identity)
-        run: cilock login --workflow-identity --platform-url "${PLATFORM_URL}"
+        run: cilock login --workflow-identity --platform-url "${PLATFORM_URL}" --tenant-id bb84a7e4-9ce3-434b-a0c6-d9e6e247ec16 --product-id "${{ vars.TESTIFYSEC_PRODUCT_ID }}"
 
       - name: Bind product
         if: ${{ vars.TESTIFYSEC_PRODUCT_ID != '' }}
