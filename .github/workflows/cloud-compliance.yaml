@@ -28,7 +28,7 @@ jobs:
 
       - name: Install cilock (built from judge main, release cilock-2026-09-03)
         run: |
-          curl -sSL -o /tmp/cilock https://github.com/cloudvault-dev/cloudvault-api/releases/download/cilock-2026-09-03/cilock-linux-amd64
+          curl -sSL -o /tmp/cilock https://github.com/testifysec/cloudvault-api/releases/download/cilock-2026-09-03/cilock-linux-amd64
           echo "464ec5650490b54561b73e087da0907360e4ceda43a7f99e7aadda28954cb7f6  /tmp/cilock" | sha256sum -c -
           install -m 0755 /tmp/cilock /usr/local/bin/cilock
           cilock version

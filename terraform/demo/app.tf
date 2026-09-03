@@ -67,7 +67,7 @@ resource "aws_instance" "app" {
     curl -sSL https://github.com/docker/compose/releases/download/v2.29.7/docker-compose-linux-x86_64 \
       -o /usr/local/lib/docker/cli-plugins/docker-compose
     chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
-    git clone --depth 1 https://github.com/cloudvault-dev/cloudvault-api.git /opt/cloudvault
+    git clone --depth 1 https://github.com/testifysec/cloudvault-api.git /opt/cloudvault
     cd /opt/cloudvault
     docker compose up -d --build
   EOT

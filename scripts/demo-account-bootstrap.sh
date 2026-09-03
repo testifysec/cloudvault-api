@@ -9,7 +9,7 @@ MGMT_PROFILE="${MGMT_PROFILE:-testifysec-prod}"
 ACCOUNT_NAME="${ACCOUNT_NAME:-cloudvault-demo}"
 ACCOUNT_EMAIL="${ACCOUNT_EMAIL:-aws+cloudvault-demo@testifysec.com}"
 REGION="${REGION:-us-east-1}"
-GITHUB_REPO="${GITHUB_REPO:-cloudvault-dev/cloudvault-api}"
+GITHUB_REPO="${GITHUB_REPO:-testifysec/cloudvault-api}"
 ROLE_NAME="cloudvault-demo-github-actions"
 
 say() { printf '\n== %s\n' "$*"; }
