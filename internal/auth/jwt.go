@@ -87,8 +87,6 @@ func (s *JWTService) generateToken(userID uuid.UUID, email string, groupIDs []st
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expiresAt),
 			IssuedAt:  jwt.NewNumericDate(now),
-			NotBefore: jwt.NewNumericDate(now),
-			Issuer:    s.issuer,
 			Subject:   userID.String(),
 		},
 	}
