@@ -1,0 +1,32 @@
+{
+  "account_id": {
+    "sensitive": false,
+    "type": "string",
+    "value": "919542772204"
+  },
+  "app_url": {
+    "sensitive": false,
+    "type": "string",
+    "value": "http://44.214.43.206:8080"
+  },
+  "cloudtrail_arn": {
+    "sensitive": false,
+    "type": "string",
+    "value": "arn:aws:cloudtrail:us-east-1:919542772204:trail/cloudvault-demo"
+  },
+  "ecr_repository_url": {
+    "sensitive": false,
+    "type": "string",
+    "value": "919542772204.dkr.ecr.us-east-1.amazonaws.com/cloudvault-demo"
+  },
+  "files_bucket": {
+    "sensitive": false,
+    "type": "string",
+    "value": "cloudvault-demo-files-919542772204"
+  },
+  "vpc_id": {
+    "sensitive": false,
+    "type": "string",
+    "value": "vpc-0e477101f7600e257"
+  }
+}

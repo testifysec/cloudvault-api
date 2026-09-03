@@ -95,7 +95,7 @@ jobs:
         run: scripts/attest.sh
         env:
           STEP: terraform-plan
-          ATTESTATIONS: environment git github aws
+          ATTESTATIONS: environment git github
           PRODUCT_GLOB: "terraform/demo/tfplan.json"
           COMMAND: >-
             terraform -chdir=${TF_DIR} plan -input=false -out=tfplan.bin && terraform -chdir=${TF_DIR} show -json tfplan.bin > ${TF_DIR}/tfplan.json
@@ -106,7 +106,7 @@ jobs:
         run: scripts/attest.sh
         env:
           STEP: terraform-apply
-          ATTESTATIONS: environment git github aws
+          ATTESTATIONS: environment git github
           PRODUCT_GLOB: "terraform/demo/outputs.json"
           COMMAND: >-
             terraform -chdir=${TF_DIR} apply -input=false -auto-approve tfplan.bin && terraform -chdir=${TF_DIR} output -json > ${TF_DIR}/outputs.json
@@ -117,7 +117,7 @@ jobs:
         run: scripts/attest.sh
         env:
           STEP: smoke-test
-          ATTESTATIONS: environment git github aws
+          ATTESTATIONS: environment git github
           PRODUCT_GLOB: "smoke.json"
           COMMAND: >-
             URL=$(jq -r .app_url.value ${TF_DIR}/outputs.json); for i in $(seq 1 30); do code=$(curl -s -o /dev/null -w '%{http_code}' "$URL/" || true); [ "$code" = "200" ] && break; sleep 10; done; echo "{\"url\":\"$URL\",\"http_code\":\"$code\",\"checked_at\":\"$(date -u +%FT%TZ)\"}" | tee smoke.json; test "$code" = "200"
@@ -136,7 +136,7 @@ jobs:
         run: scripts/attest.sh
         env:
           STEP: cloud-posture
-          ATTESTATIONS: environment git github aws asff
+          ATTESTATIONS: environment git github asff
           PRODUCT_GLOB: "prowler.asff.json"
           COMMAND: >-
             prowler aws --region ${AWS_REGION} -M json-asff -o prowler-out -F prowler --ignore-exit-code-3 --no-banner || true; cp prowler-out/prowler.asff.json prowler.asff.json

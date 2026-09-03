@@ -54,7 +54,7 @@ jobs:
         run: scripts/attest.sh
         env:
           STEP: conmon-nist-800-53
-          ATTESTATIONS: environment git github aws asff
+          ATTESTATIONS: environment git github asff
           PRODUCT_GLOB: "conmon-nist.asff.json"
           COMMAND: >-
             prowler aws --region ${AWS_REGION} --compliance nist_800_53_revision_5_aws -M json-asff -o prowler-nist -F nist --ignore-exit-code-3 --no-banner || true; cp prowler-nist/nist.asff.json conmon-nist.asff.json
@@ -64,7 +64,7 @@ jobs:
         run: scripts/attest.sh
         env:
           STEP: conmon-cis
-          ATTESTATIONS: environment git github aws asff
+          ATTESTATIONS: environment git github asff
           PRODUCT_GLOB: "conmon-cis.asff.json"
           COMMAND: >-
             prowler aws --region ${AWS_REGION} --compliance cis_2.0_aws -M json-asff -o prowler-cis -F cis --ignore-exit-code-3 --no-banner || true; cp prowler-cis/cis.asff.json conmon-cis.asff.json

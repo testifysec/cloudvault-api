@@ -10,7 +10,7 @@ services:
     environment:
       - PORT=8080
       - DATABASE_URL=postgres://dropbox:dropbox@postgres:5432/dropbox?sslmode=disable
-      - JWT_SECRET=dev-secret-change-in-production
+      - JWT_SECRET=cloudvault-demo-jwt-secret-2026-09-03-not-for-production-use
       - AWS_REGION=us-east-1
       - S3_BUCKET=dropbox-clone-dev
       # For local dev, use MinIO instead of real S3
