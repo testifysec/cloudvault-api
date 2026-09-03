@@ -70,7 +70,7 @@ TRUST="$(cat <<JSON
 {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Federated":"${OIDC_ARN}"},
  "Action":"sts:AssumeRoleWithWebIdentity","Condition":{
    "StringEquals":{"token.actions.githubusercontent.com:aud":"sts.amazonaws.com"},
-   "StringLike":{"token.actions.githubusercontent.com:sub":"repo:${GITHUB_REPO}:*"}}}]}
+   "StringLike":{"token.actions.githubusercontent.com:sub":["repo:${GITHUB_REPO}:*","repo:${GITHUB_REPO%%/*}@*/${GITHUB_REPO##*/}@*:*"]}}}]}
 JSON
 )"
 if ! aws iam get-role --role-name "$ROLE_NAME" >/dev/null 2>&1; then
