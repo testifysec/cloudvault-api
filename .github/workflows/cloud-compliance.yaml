@@ -1,0 +1,70 @@
+name: Cloud Compliance (ConMon)
+
+# Continuous monitoring of the demo account, NIST SP 800-137 style: on a schedule, not on a
+# code change. Prowler evaluates the live account against NIST 800-53 Rev 5 and CIS; every
+# run is signed by cilock and lands on the CloudVault product as fresh CA-7 / RA-5 / SI-4
+# evidence with a timestamp an assessor can check.
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  PLATFORM_URL: https://platform.testifysec.com
+  AWS_REGION: us-east-1
+
+jobs:
+  conmon:
+    name: Prowler posture (attested)
+    runs-on: ubuntu-latest
+    concurrency: cloudvault-demo-conmon
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cilock (built from judge main, release cilock-2026-09-03)
+        run: |
+          curl -sSL -o /tmp/cilock https://github.com/cloudvault-dev/cloudvault-api/releases/download/cilock-2026-09-03/cilock-linux-amd64
+          echo "464ec5650490b54561b73e087da0907360e4ceda43a7f99e7aadda28954cb7f6  /tmp/cilock" | sha256sum -c -
+          install -m 0755 /tmp/cilock /usr/local/bin/cilock
+          cilock version
+
+      - name: Platform login (ambient GitHub workflow identity)
+        run: cilock login --workflow-identity --platform-url "${PLATFORM_URL}"
+
+      - name: Bind product
+        if: ${{ vars.TESTIFYSEC_PRODUCT_ID != '' }}
+        run: cilock use --product-id "${{ vars.TESTIFYSEC_PRODUCT_ID }}" --product-name cloudvault
+
+      - name: Configure AWS credentials (GitHub OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_GITHUB_ACTIONS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install prowler
+        run: pipx install prowler==4.6.2 || pip3 install --quiet prowler==4.6.2
+
+      # ---- CA-7 / RA-5 / SI-4: NIST 800-53 Rev 5 posture of the live account ----
+      - name: Posture vs NIST 800-53 Rev 5 (prowler)
+        run: scripts/attest.sh
+        env:
+          STEP: conmon-nist-800-53
+          ATTESTATIONS: environment git github aws asff
+          PRODUCT_GLOB: "conmon-nist.asff.json"
+          COMMAND: >-
+            prowler aws --region ${AWS_REGION} --compliance nist_800_53_revision_5_aws -M json-asff -o prowler-nist -F nist --ignore-exit-code-3 --no-banner || true; cp prowler-nist/nist.asff.json conmon-nist.asff.json
+
+      # ---- CM-6: CIS benchmark of the same account ----
+      - name: Posture vs CIS (prowler)
+        run: scripts/attest.sh
+        env:
+          STEP: conmon-cis
+          ATTESTATIONS: environment git github aws asff
+          PRODUCT_GLOB: "conmon-cis.asff.json"
+          COMMAND: >-
+            prowler aws --region ${AWS_REGION} --compliance cis_2.0_aws -M json-asff -o prowler-cis -F cis --ignore-exit-code-3 --no-banner || true; cp prowler-cis/cis.asff.json conmon-cis.asff.json
