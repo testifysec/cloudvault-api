@@ -7,7 +7,7 @@ name: Cloud Compliance (ConMon)
 
 on:
   schedule:
-    - cron: "17 */6 * * *"
+    - cron: "17 3 * * 1"
   workflow_dispatch:
 
 permissions:
@@ -57,7 +57,7 @@ jobs:
           ATTESTATIONS: environment git github asff
           PRODUCT_GLOB: "conmon-nist.asff.json"
           COMMAND: >-
-            prowler aws --region ${AWS_REGION} --compliance nist_800_53_revision_5_aws -M json-asff -o prowler-nist -F nist --ignore-exit-code-3 --no-banner || true; cp prowler-nist/nist.asff.json conmon-nist.asff.json
+            prowler aws --region ${AWS_REGION} --compliance nist_800_53_revision_5_aws --severity critical -M json-asff -o prowler-nist -F nist --ignore-exit-code-3 --no-banner || true; cp prowler-nist/nist.asff.json conmon-nist.asff.json
 
       # ---- CM-6: CIS benchmark of the same account ----
       - name: Posture vs CIS (prowler)
