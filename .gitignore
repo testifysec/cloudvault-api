@@ -62,3 +62,7 @@ temp/
 # Coverage reports
 coverage.html
 coverage.txt
+
+**/.terraform/
+*.tfplan
+tfplan.bin

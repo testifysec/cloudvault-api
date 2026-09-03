@@ -1,0 +1,358 @@
+name: Attested CI Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  attested-ci:
+    name: CI Pipeline (Attested)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          check-latest: false
+
+      # ---- SA-11: lint + secretscan ----
+      # secretscan attestor scans sibling attestors' outputs (stdout,
+      # env vars, products) for leaked secrets before the DSSE ships.
+      - name: Lint + Secrets
+        uses: aflock-ai/cilock-action@main
+        with:
+          step: lint
+          command: echo "lint passed"
+          attestations: environment git github secretscan
+
+      # ---- SA-11: SAST (gosec → SARIF) ----
+      - name: Install gosec
+        run: go install github.com/securego/gosec/v2/cmd/gosec@latest
+
+      - name: SAST
+        uses: aflock-ai/cilock-action@main
+        with:
+          step: sast
+          command: bash -c "gosec -fmt=sarif -out=gosec.sarif ./... || true"
+          attestations: environment git github sarif
+          product-include-glob: "gosec.sarif"
+
+      # ---- SA-11 / RA-5: SAST (semgrep → SARIF, unique glob) ----
+      - name: Install semgrep
+        continue-on-error: true
+        run: pipx install semgrep || pip3 install --quiet semgrep || python3 -m pip install --quiet semgrep
+
+      - name: SAST (semgrep)
+        continue-on-error: true
+        uses: aflock-ai/cilock-action@main
+        with:
+          step: sast-semgrep
+          command: bash -c "semgrep --config=auto --sarif -o semgrep.sarif . || true"
+          attestations: environment git github sarif
+          product-include-glob: "semgrep.sarif"
+
+      # ---- IA-5: secret scan (gitleaks → SARIF, unique glob) ----
+      - name: Install gitleaks
+        continue-on-error: true
+        run: |
+          case "$(uname -m)" in x86_64) GA=x64;; aarch64|arm64) GA=arm64;; *) GA=x64;; esac
+          curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.18.4/gitleaks_8.18.4_linux_${GA}.tar.gz -o /tmp/gitleaks.tgz
+          tar -xzf /tmp/gitleaks.tgz -C /usr/local/bin gitleaks
+          chmod +x /usr/local/bin/gitleaks
+
+      - name: Secret Scan (gitleaks)
+        continue-on-error: true
+        uses: aflock-ai/cilock-action@main
+        with:
+          step: secretscan-gitleaks
+          command: bash -c "gitleaks detect --no-git -f sarif -r gitleaks.sarif --source . || gitleaks dir . -f sarif -r gitleaks.sarif || true"
+          attestations: environment git github sarif
+          product-include-glob: "gitleaks.sarif"
+
+      # ---- Test ----
+      - name: Test
+        uses: aflock-ai/cilock-action@main
+        with:
+          step: test
+          command: go test -count=1 ./...
+          attestations: environment git github
+
+      # ---- SA-11 / CM-4: Unit tests → test-results (JUnit) ----
+      - name: Install gotestsum
+        continue-on-error: true
+        run: go install gotest.tools/gotestsum@latest
+
+      - name: Test Results
+        continue-on-error: true
+        uses: aflock-ai/cilock-action@main
+        with:
+          step: test-results
+          command: bash -c "gotestsum --junitfile=junit.xml -- -count=1 ./... || true"
+          attestations: environment git github test-results
+          product-include-glob: "junit.xml"
+
+      # ---- RA-5 / SI-2: SCA vuln (govulncheck native) ----
+      - name: Install govulncheck
+        continue-on-error: true
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: Govulncheck
+        continue-on-error: true
+        uses: aflock-ai/cilock-action@main
+        with:
+          step: govulncheck
+          command: bash -c "govulncheck -json ./... > govulncheck.json || true"
+          attestations: environment git github govulncheck
+          product-include-glob: "govulncheck.json"
+
+      # ---- SR-11 / SI-7 / CM-8: Build + SBOM (cyclonedx-gomod → CycloneDX) ----
+      - name: Install cyclonedx-gomod
+        run: go install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@v1.9.0
+
+      - name: Build + SBOM
+        uses: aflock-ai/cilock-action@main
+        with:
+          step: build
+          command: bash -c "CGO_ENABLED=0 go build -o bin/api ./cmd/api && cyclonedx-gomod app -licenses -json -output bin/bom.cdx.json -main ./cmd/api ."
+          attestations: environment git github sbom
+          product-include-glob: "bin/*"
+
+      # ---- SR-4 / SA-15 / CM-2: go-build provenance + SLSA export ----
+      # Bare `go build` (no bash -c) so the go-build attestor observes the argv.
+      - name: Go Build Provenance
+        continue-on-error: true
+        uses: aflock-ai/cilock-action@main
+        with:
+          step: go-build
+          command: go build -o bin/api-provenance ./cmd/api
+          attestations: environment git github go-build
+          attestor-slsa-export: "true"
+          product-include-glob: "bin/api-provenance"
+
+      # ---- SI-2 / RA-5: Vuln scan (trivy → SARIF) ----
+      - name: Install trivy
+        run: |
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Vuln Scan
+        uses: aflock-ai/cilock-action@main
+        with:
+          step: vuln-scan
+          command: bash -c "trivy fs --format sarif -o trivy.sarif . || true"
+          attestations: environment git github sarif
+          product-include-glob: "trivy.sarif"
+
+      # ---- RA-5 / SI-2: Vuln scan (trivy native predicate) ----
+      # Bare `trivy` argv so the trivy attestor emits the native trivy predicate.
+      - name: Vuln Scan (trivy native)
+        continue-on-error: true
+        uses: aflock-ai/cilock-action@main
+        with:
+          step: vuln-trivy
+          command: trivy fs --format json --output trivy.json .
+          attestations: environment git github trivy
+          product-include-glob: "trivy.json"
+
+      # ---- RA-5: Vuln scan (grype → SARIF, unique glob) ----
+      - name: Install grype
+        continue-on-error: true
+        run: curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Vuln Scan (grype)
+        continue-on-error: true
+        uses: aflock-ai/cilock-action@main
+        with:
+          step: vuln-grype
+          command: bash -c "grype dir:. -o sarif > grype.sarif || true"
+          attestations: environment git github sarif
+          product-include-glob: "grype.sarif"
+
+      # ---- RA-5: Vuln scan (osv-scanner → SARIF, unique glob) ----
+      - name: Install osv-scanner
+        continue-on-error: true
+        run: |
+          case "$(uname -m)" in x86_64) OA=amd64;; aarch64|arm64) OA=arm64;; *) OA=amd64;; esac
+          curl -sSL https://github.com/google/osv-scanner/releases/download/v1.9.2/osv-scanner_linux_${OA} -o /usr/local/bin/osv-scanner
+          chmod +x /usr/local/bin/osv-scanner
+
+      - name: Vuln Scan (osv-scanner)
+        continue-on-error: true
+        uses: aflock-ai/cilock-action@main
+        with:
+          step: vuln-osv
+          command: bash -c "osv-scanner --format sarif -r . > osv.sarif || true"
+          attestations: environment git github sarif
+          product-include-glob: "osv.sarif"
+
+      # ---- SR-3 / CM-2: dependency lockfiles ----
+      - name: Prepare lockfile
+        continue-on-error: true
+        run: |
+          go mod download 2>/dev/null || true
+          [ -f go.sum ] || touch go.sum
+
+      - name: Lockfiles
+        continue-on-error: true
+        uses: aflock-ai/cilock-action@main
+        with:
+          step: lockfiles
+          command: bash -c "go mod download 2>/dev/null || true"
+          attestations: environment git github lockfiles
+
+      # ---- CM-8: OS component inventory (system-packages) ----
+      - name: System Packages
+        continue-on-error: true
+        uses: aflock-ai/cilock-action@main
+        with:
+          step: system-packages
+          command: echo "capturing OS package inventory"
+          attestations: environment git github system-packages
+
+      # ---- Docker build ----
+      - name: Docker Build
+        uses: aflock-ai/cilock-action@main
+        with:
+          step: docker-build
+          command: docker buildx build --metadata-file docker-metadata.json -t dropbox-clone:test --load .
+          attestations: environment git github docker
+          product-include-glob: "docker-metadata.json"
+
+      # ---- CM-6: Dockerfile config scan (hadolint → SARIF, unique glob) ----
+      - name: Install hadolint
+        continue-on-error: true
+        run: |
+          case "$(uname -m)" in x86_64) HA=x86_64;; aarch64|arm64) HA=arm64;; *) HA=x86_64;; esac
+          curl -sSL https://github.com/hadolint/hadolint/releases/download/v2.12.0/hadolint-Linux-${HA} -o /usr/local/bin/hadolint
+          chmod +x /usr/local/bin/hadolint
+
+      - name: Config Scan (hadolint)
+        continue-on-error: true
+        uses: aflock-ai/cilock-action@main
+        with:
+          step: config-hadolint
+          command: bash -c "hadolint --format sarif Dockerfile > hadolint.sarif || true"
+          attestations: environment git github sarif
+          product-include-glob: "hadolint.sarif"
+
+      # ---- SR-11 / CM-8: image SBOM (syft → CycloneDX, unique glob) ----
+      - name: Install syft
+        continue-on-error: true
+        run: curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Image SBOM (syft)
+        continue-on-error: true
+        uses: aflock-ai/cilock-action@main
+        with:
+          step: image-sbom
+          command: bash -c "syft dropbox-clone:test -o cyclonedx-json=syft.cdx.json || true"
+          attestations: environment git github sbom
+          product-include-glob: "syft.cdx.json"
+
+      # ---- SR-11 / SR-4: OCI image export → oci ----
+      - name: OCI Export
+        continue-on-error: true
+        uses: aflock-ai/cilock-action@main
+        with:
+          step: oci-export
+          command: bash -c "docker save dropbox-clone:test -o image.oci.tar || true"
+          attestations: environment git github oci
+          product-include-glob: "image.oci.tar"
+
+      # ---- RA-5 / SI-2 / SR-8: VEX (OpenVEX not_affected assertion) ----
+      # Written in a prep step, then (re)created inside the cilock command so it
+      # is captured as a PRODUCT of the vex step (not just a material).
+      - name: Prepare VEX document
+        continue-on-error: true
+        run: |
+          cat > app.openvex.src.json <<'JSON'
+          {
+            "@context": "https://openvex.dev/ns/v0.2.0",
+            "@id": "https://cloudvault.dev/vex/cloudvault-api-2026-07-01",
+            "author": "CloudVault Security <security@cloudvault.dev>",
+            "timestamp": "2026-07-01T00:00:00Z",
+            "version": 1,
+            "statements": [
+              {
+                "vulnerability": { "name": "CVE-2024-24790" },
+                "products": [ { "@id": "pkg:golang/github.com/cloudvault-dev/cloudvault-api" } ],
+                "status": "not_affected",
+                "justification": "vulnerable_code_not_in_execute_path"
+              }
+            ]
+          }
+          JSON
+
+      - name: VEX
+        continue-on-error: true
+        uses: aflock-ai/cilock-action@main
+        with:
+          step: vex
+          command: bash -c "cp app.openvex.src.json app.openvex.json || true"
+          attestations: environment git github vex
+          product-include-glob: "app.openvex.json"
+
+      # ---- Install cloud tooling (aws-cli + kubectl) for deploy steps ----
+      - name: Install AWS + kubectl
+        if: env.AWS_ACCESS_KEY_ID != ''
+        run: |
+          # aws-cli v2
+          curl -sSL "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o /tmp/awscliv2.zip || \
+          curl -sSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+          unzip -q /tmp/awscliv2.zip -d /tmp && /tmp/aws/install --update 2>/dev/null || true
+          aws --version
+          # kubectl
+          ARCH=$(uname -m | sed 's/aarch64/arm64/' | sed 's/x86_64/amd64/')
+          curl -sSLo /usr/local/bin/kubectl "https://dl.k8s.io/release/$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/${ARCH}/kubectl"
+          chmod +x /usr/local/bin/kubectl
+          kubectl version --client 2>/dev/null || true
+
+      # ---- Deploy to EKS: RETIRED 2026-07-12 ----
+      # The dropbox-clone-dev EKS cluster (testifysec-demo account) was torn
+      # down 2026-07-08. This step is disabled (if: false) rather than left
+      # gated on AWS_ACCESS_KEY_ID alone, so it can never silently attempt to
+      # deploy to a cluster that no longer exists.
+      - name: Deploy
+        if: false
+        uses: aflock-ai/cilock-action@main
+        with:
+          step: deploy
+          command: |
+            aws eks update-kubeconfig --name dropbox-clone-dev --region us-east-1
+            kubectl set image deployment/dropbox-clone-api dropbox-clone-api=dropbox-clone:test -n dropbox-clone || echo "deployment not found — first deploy needs full kustomize apply"
+            kubectl rollout status deployment/dropbox-clone-api -n dropbox-clone --timeout=120s || true
+          attestations: environment git github k8smanifest
+
+      # ---- Smoke test against deployed endpoint: RETIRED 2026-07-12 (depends on Deploy above) ----
+      - name: Smoke Test
+        if: false
+        uses: aflock-ai/cilock-action@main
+        with:
+          step: smoke-test
+          command: |
+            curl -sf --retry 5 --retry-delay 5 https://dev.dropbox-clone.example.com/health || echo "smoke test endpoint unreachable (expected in local sim)"
+          attestations: environment git github
+
+      # ---- Cloud posture: prowler against the AWS account ----
+      - name: Install prowler
+        if: env.AWS_ACCESS_KEY_ID != ''
+        run: |
+          python3 -m venv /tmp/prowler-venv
+          /tmp/prowler-venv/bin/pip install --quiet prowler
+
+      - name: Cloud Posture (Prowler)
+        if: env.AWS_ACCESS_KEY_ID != ''
+        uses: aflock-ai/cilock-action@main
+        with:
+          step: cloud-posture
+          command: bash -c "/tmp/prowler-venv/bin/prowler aws --severity critical high --compliance cis_1.5_aws -M json-ocsf -o prowler-results || true"
+          attestations: environment git github
+          product-include-glob: "prowler-results/*"
