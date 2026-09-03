@@ -106,6 +106,17 @@ jobs:
           COMMAND: >-
             terraform -chdir=${TF_DIR} apply -input=false -auto-approve tfplan.bin && terraform -chdir=${TF_DIR} output -json > ${TF_DIR}/outputs.json
 
+      # ---- SI-4 / CM-8: the deployed GUI answers (deployment evidence) ----
+      - name: Smoke Test (deployed GUI)
+        if: ${{ github.event.inputs.action != 'destroy' }}
+        run: scripts/attest.sh
+        env:
+          STEP: smoke-test
+          ATTESTATIONS: environment git github aws
+          PRODUCT_GLOB: "smoke.json"
+          COMMAND: >-
+            URL=$(jq -r .app_url.value ${TF_DIR}/outputs.json); for i in $(seq 1 30); do code=$(curl -s -o /dev/null -w '%{http_code}' "$URL/" || true); [ "$code" = "200" ] && break; sleep 10; done; echo "{\"url\":\"$URL\",\"http_code\":\"$code\",\"checked_at\":\"$(date -u +%FT%TZ)\"}" | tee smoke.json; test "$code" = "200"
+
       - name: Terraform Destroy
         if: ${{ github.event.inputs.action == 'destroy' }}
         run: terraform -chdir=${TF_DIR} destroy -input=false -auto-approve

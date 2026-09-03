@@ -17,3 +17,7 @@ output "ecr_repository_url" {
 output "cloudtrail_arn" {
   value = aws_cloudtrail.main.arn
 }
+
+output "app_url" {
+  value = "http://${aws_instance.app.public_ip}:8080"
+}
